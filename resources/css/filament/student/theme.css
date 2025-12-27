@@ -1,0 +1,7 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament';
+@source '../../../../resources/views/filament';
+@source '../../../../resources/views/infolists';
+@source '../../../../resources/views/tables';
+@source '../../../../resources/views';
