@@ -88,9 +88,11 @@
                                         Quiz in progress
                                     </span>
                                 </div>
-                                <p class="mt-1 text-xs text-amber-700 dark:text-amber-400">
-                                    Started {{ $inProgress->started_at->diffForHumans() }}
-                                </p>
+                                @if ($inProgress->started_at)
+                                    <p class="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                                        Started {{ $inProgress->started_at->diffForHumans() }}
+                                    </p>
+                                @endif
                             </div>
                         @endif
 

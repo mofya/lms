@@ -2,37 +2,39 @@
 
 namespace App\Infolists\Components;
 
-use Filament\Schemas\Components\Component;
 use App\Filament\Student\Resources\CourseResource;
-use Filament\Infolists\Components\Concerns\HasName;
+use App\Models\Course;
+use Filament\Schemas\Components\Component;
 
 class ListLessons extends Component
 {
-    use HasName;
-
     protected string $view = 'infolists.components.list-lessons';
 
-    protected $course;
+    protected ?Course $course = null;
 
-    protected $lessons;
+    protected $lessons = null;
 
     protected $activeLesson = null;
 
-    final public function __construct(string $name)
+    public static function make(string $name): static
     {
-        $this->name($name);
-        $this->statePath($name);
+        return new static;
     }
 
-    public function course($course)
+    public function course($course): static
     {
-        $this->course  = $course;
+        $this->course = $course;
         $this->lessons = $course->publishedLessons;
+
+        $this->viewData([
+            'course' => $this->course,
+            'lessons' => $this->lessons,
+        ]);
 
         return $this;
     }
 
-    public function activeLesson($lesson)
+    public function activeLesson($lesson): static
     {
         $this->activeLesson = $lesson;
 
@@ -49,7 +51,7 @@ class ListLessons extends Component
         return $this->activeLesson?->id === $lesson->id;
     }
 
-    public function getCourse()
+    public function getCourse(): ?Course
     {
         return $this->course;
     }
@@ -59,16 +61,11 @@ class ListLessons extends Component
         return $this->lessons;
     }
 
-    public function getUrl($lesson)
+    public function getUrl($lesson): string
     {
         return CourseResource::getUrl('lessons.view', [
             'parent' => $this->course,
             'record' => $lesson,
         ]);
-    }
-
-    public static function make(string $name): static
-    {
-        return app(static::class, ['name' => $name]);
     }
 }

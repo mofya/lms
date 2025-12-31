@@ -2,14 +2,14 @@
 
 namespace App\Filament\Student\Resources;
 
-use BackedEnum;
 use App\Filament\Resources\QuizResource\Pages\ListQuizzes;
 use App\Filament\Student\Resources\CourseResource\Pages\ListCourses;
 use App\Filament\Student\Resources\CourseResource\Pages\ViewCourse;
 use App\Filament\Student\Resources\LessonResource\Pages\ViewLesson;
 use App\Models\Course;
-use Filament\Schemas\Schema;
+use BackedEnum;
 use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Columns\Layout\Grid;
 use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
@@ -40,6 +40,16 @@ class CourseResource extends Resource
         return $schema
             ->schema([
                 //
+            ]);
+    }
+
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                \Filament\Infolists\Components\TextEntry::make('description_text')
+                    ->label('')
+                    ->columnSpanFull(),
             ]);
     }
 
@@ -78,9 +88,9 @@ class CourseResource extends Resource
     {
         return [
             'index' => ListCourses::route('/'),
-            'view'  => ViewCourse::route('/{record}'),
+            'view' => ViewCourse::route('/{record}'),
             'lessons.view' => ViewLesson::route('/{parent}/lessons/{record}'),
-            'quizzes.index'  => ListQuizzes::route('/{parent}/quizzes'),
+            'quizzes.index' => ListQuizzes::route('/{parent}/quizzes'),
 
         ];
     }
