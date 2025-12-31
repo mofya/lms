@@ -65,10 +65,11 @@ class CourseResource extends Resource
                             ->extraImgAttributes(['class' => 'w-full rounded'])
                             ->height('auto'),
                         TextColumn::make('title')
+                            ->formatStateUsing(fn (string $state): string => trim($state, '"'))
                             ->weight(FontWeight::SemiBold)
                             ->extraAttributes(['class' => 'text-lg']),
-                        TextColumn::make('description')
-                            ->html(),
+                        TextColumn::make('description_text')
+                            ->limit(150),
                     ]),
             ])
             ->contentGrid(['md' => 2, 'xl' => 3])

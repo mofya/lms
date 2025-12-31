@@ -3,7 +3,6 @@
 namespace App\Filament\Student\Resources\CourseResource\Pages;
 
 use App\Filament\Student\Resources\CourseResource;
-use App\Filament\Student\Widgets\QuizWidget;
 use App\Infolists\Components\ListLessons;
 use App\Infolists\Components\ListQuizzes;
 use Filament\Resources\Pages\ViewRecord;
@@ -39,7 +38,7 @@ class ViewCourse extends ViewRecord
     protected function getHeaderWidgets(): array
     {
         return [
-            QuizWidget::class,
+
         ];
     }
 }
