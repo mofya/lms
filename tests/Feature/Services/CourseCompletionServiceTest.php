@@ -270,4 +270,34 @@ class CourseCompletionServiceTest extends TestCase
 
         $this->assertTrue($this->service->hasCompletedAllQuizzes($user, $course));
     }
+
+    public function test_observer_triggers_certificate_on_quiz_submission(): void
+    {
+        $user = User::factory()->create();
+        $course = Course::factory()->create();
+        $quiz = Quiz::factory()->create([
+            'course_id' => $course->id,
+            'is_published' => true,
+        ]);
+        Question::factory()->count(5)->create()->each(fn ($q) => $quiz->questions()->attach($q));
+
+        $test = Test::factory()->inProgress()->create([
+            'user_id' => $user->id,
+            'quiz_id' => $quiz->id,
+        ]);
+
+        $this->assertEquals(0, Certificate::count());
+
+        $test->update([
+            'submitted_at' => now(),
+            'result' => 5,
+            'correct_count' => 5,
+            'wrong_count' => 0,
+        ]);
+
+        $this->assertEquals(1, Certificate::count());
+        $certificate = Certificate::first();
+        $this->assertEquals($user->id, $certificate->user_id);
+        $this->assertEquals($course->id, $certificate->course_id);
+    }
 }
