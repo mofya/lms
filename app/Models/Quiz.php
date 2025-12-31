@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\FeedbackTiming;
 use App\Enums\NavigatorPosition;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -31,6 +32,12 @@ class Quiz extends Model
         'show_progress_bar',
         'allow_question_navigation',
         'auto_advance_on_answer',
+        'questions_per_attempt',
+        'show_correct_answers',
+        'show_explanations',
+        'feedback_timing',
+        'passing_score',
+        'require_passing_to_proceed',
     ];
 
     public function questions(): BelongsToMany
@@ -63,7 +70,45 @@ class Quiz extends Model
             'show_progress_bar' => 'boolean',
             'allow_question_navigation' => 'boolean',
             'auto_advance_on_answer' => 'boolean',
+            'questions_per_attempt' => 'integer',
+            'show_correct_answers' => 'boolean',
+            'show_explanations' => 'boolean',
+            'feedback_timing' => FeedbackTiming::class,
+            'passing_score' => 'integer',
+            'require_passing_to_proceed' => 'boolean',
         ];
+    }
+
+    public function getQuestionsToShowCount(): int
+    {
+        if ($this->questions_per_attempt && $this->questions_per_attempt > 0) {
+            return min($this->questions_per_attempt, $this->questions()->count());
+        }
+
+        return $this->questions()->count();
+    }
+
+    public function isPassing(int $correctCount, int $totalQuestions): bool
+    {
+        if (! $this->passing_score || $totalQuestions === 0) {
+            return true;
+        }
+
+        $percentage = ($correctCount / $totalQuestions) * 100;
+
+        return $percentage >= $this->passing_score;
+    }
+
+    public function shouldShowFeedback(?Test $test = null): bool
+    {
+        $timing = $this->feedback_timing ?? FeedbackTiming::AfterSubmit;
+
+        return match ($timing) {
+            FeedbackTiming::Never => false,
+            FeedbackTiming::Immediate => true,
+            FeedbackTiming::AfterSubmit => $test?->isSubmitted() ?? false,
+            FeedbackTiming::AfterDeadline => $this->end_time && now()->isAfter($this->end_time),
+        };
     }
 
     public function isActive(): bool

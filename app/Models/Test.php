@@ -23,6 +23,7 @@ class Test extends Model
         'submitted_at',
         'correct_count',
         'wrong_count',
+        'question_ids',
     ];
 
     protected function casts(): array
@@ -34,6 +35,7 @@ class Test extends Model
             'wrong_count' => 'integer',
             'time_spent' => 'integer',
             'result' => 'integer',
+            'question_ids' => 'array',
         ];
     }
 
@@ -52,7 +54,7 @@ class Test extends Model
         return $this->belongsToMany(Question::class, 'test_answers', 'test_id', 'question_id');
     }
 
-    public function testAnswers(): HasMany
+    public function test_answers(): HasMany
     {
         return $this->hasMany(TestAnswer::class);
     }
