@@ -9,13 +9,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class TestAnswer extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'correct',
         'user_id',
         'test_id',
         'question_id',
         'option_id',
-        'user_answer'
+        'user_answer',
     ];
 
     public function user(): BelongsTo
@@ -33,15 +34,12 @@ class TestAnswer extends Model
         return $this->belongsTo(Question::class);
     }
 
+    protected $casts = [
+        'correct' => 'boolean',
+    ];
+
     public function option(): BelongsTo
     {
         return $this->belongsTo(QuestionOption::class, 'option_id');
-    }
-
-    protected function casts(): array
-    {
-        return [
-            'correct' => 'boolean',
-        ];
     }
 }

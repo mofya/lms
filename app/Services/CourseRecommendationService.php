@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Course;
 use App\Models\User;
-use Illuminate\Support\Facades\Http;
 
 class CourseRecommendationService
 {
@@ -16,14 +15,19 @@ class CourseRecommendationService
         // Get user's completed courses and performance
         $completedCourses = $user->courses()->with('lecturer')->get();
         $grades = $user->grades()->with('course')->get();
-        
+
+        // Extract completed lecturers upfront to avoid N+1 in ranking
+        $completedLecturerIds = $completedCourses->pluck('lecturer_id')->filter()->unique();
+
         // Build context for AI
         $context = $this->buildUserContext($user, $completedCourses, $grades);
-        
-        // Get all available courses (not enrolled)
+        $context['completed_lecturer_ids'] = $completedLecturerIds;
+
+        // Get all available courses (not enrolled) with counts to avoid N+1
         $availableCourses = Course::where('is_published', true)
-            ->whereDoesntHave('students', fn($q) => $q->where('users.id', $user->id))
+            ->whereDoesntHave('students', fn ($q) => $q->where('users.id', $user->id))
             ->with('lecturer')
+            ->withCount('students')
             ->get();
 
         if ($availableCourses->isEmpty()) {
@@ -58,29 +62,31 @@ class CourseRecommendationService
         // Simple rule-based ranking (can be enhanced with AI)
         $scoredCourses = [];
 
+        // Use pre-loaded lecturer IDs from context
+        $completedLecturerIds = $context['completed_lecturer_ids'] ?? collect();
+
         foreach ($courses as $course) {
             $score = 0;
 
-            // Boost if lecturer matches previous courses
-            $completedLecturers = collect($context['completed_courses'])
-                ->map(fn($title) => Course::where('title', $title)->first()?->lecturer_id)
-                ->filter()
-                ->unique();
-            
-            if ($completedLecturers->contains($course->lecturer_id)) {
+            // Boost if lecturer matches previous courses (no N+1 - using pre-loaded data)
+            if ($completedLecturerIds->contains($course->lecturer_id)) {
                 $score += 10;
             }
 
-            // Boost based on enrollment count (popularity)
-            $enrollmentCount = $course->students()->count();
+            // Boost based on enrollment count (no N+1 - using withCount)
+            $enrollmentCount = $course->students_count ?? 0;
             $score += min($enrollmentCount / 10, 5);
 
             // Boost if course has quizzes/assignments (more complete)
             $hasQuizzes = $course->quizzes()->published()->exists();
             $hasAssignments = $course->assignments()->where('is_published', true)->exists();
-            
-            if ($hasQuizzes) $score += 3;
-            if ($hasAssignments) $score += 3;
+
+            if ($hasQuizzes) {
+                $score += 3;
+            }
+            if ($hasAssignments) {
+                $score += 3;
+            }
 
             $scoredCourses[] = [
                 'course' => $course,
@@ -89,7 +95,7 @@ class CourseRecommendationService
         }
 
         // Sort by score and return top courses
-        usort($scoredCourses, fn($a, $b) => $b['score'] <=> $a['score']);
+        usort($scoredCourses, fn ($a, $b) => $b['score'] <=> $a['score']);
 
         return array_slice($scoredCourses, 0, $limit);
     }
@@ -101,7 +107,7 @@ class CourseRecommendationService
     {
         $completedCourses = $user->courses()->pluck('title')->toArray();
         $availableCourses = Course::where('is_published', true)
-            ->whereDoesntHave('students', fn($q) => $q->where('users.id', $user->id))
+            ->whereDoesntHave('students', fn ($q) => $q->where('users.id', $user->id))
             ->get();
 
         if (empty($completedCourses) || $availableCourses->isEmpty()) {
@@ -109,7 +115,7 @@ class CourseRecommendationService
         }
 
         $prompt = $this->buildRecommendationPrompt($completedCourses, $availableCourses);
-        
+
         // Call AI (similar to study assistant)
         // For now, fallback to rule-based
         return $this->getRecommendations($user, $limit);
@@ -118,10 +124,10 @@ class CourseRecommendationService
     protected function buildRecommendationPrompt(array $completedCourses, $availableCourses): string
     {
         $courseList = $availableCourses->pluck('title')->implode(', ');
-        
-        $prompt = "Based on these completed courses: " . implode(', ', $completedCourses) . "\n";
+
+        $prompt = 'Based on these completed courses: '.implode(', ', $completedCourses)."\n";
         $prompt .= "Recommend the most relevant courses from: {$courseList}\n";
-        $prompt .= "Return a JSON array of course titles in order of relevance.";
+        $prompt .= 'Return a JSON array of course titles in order of relevance.';
 
         return $prompt;
     }
