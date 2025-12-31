@@ -114,7 +114,7 @@ class TakeQuiz extends Page
     protected function initializeAnswers(): void
     {
         // Load existing answers from database
-        $existingAnswers = $this->test->testAnswers()
+        $existingAnswers = $this->test->test_answers()
             ->get()
             ->keyBy('question_id');
 

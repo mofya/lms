@@ -82,7 +82,7 @@ class Test extends Model
     {
         $score = 0;
 
-        foreach ($this->testAnswers as $answer) {
+        foreach ($this->test_answers as $answer) {
             $question = $answer->question;
             if ($question && $question->evaluateAnswer($answer)) {
                 $score++;
@@ -97,7 +97,7 @@ class Test extends Model
      */
     public function getScorePercentageAttribute(): float
     {
-        $totalQuestions = $this->testAnswers->count();
+        $totalQuestions = $this->test_answers->count();
         if ($totalQuestions === 0) {
             return 0;
         }

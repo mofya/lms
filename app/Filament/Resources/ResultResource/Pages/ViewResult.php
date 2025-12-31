@@ -2,21 +2,17 @@
 
 namespace App\Filament\Resources\ResultResource\Pages;
 
-use Filament\Actions\EditAction;
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Components\RepeatableEntry;
-use Filament\Infolists\Components\Fieldset;
-use App\Models\Test;
-use Filament\Actions;
-use Filament\Infolists;
-use App\Models\TestAnswer;
-use App\Models\QuestionOption;
-use Illuminate\Support\HtmlString;
-use Filament\Support\Enums\FontWeight;
-use Filament\Resources\Pages\ViewRecord;
 use App\Filament\Resources\ResultResource;
+use App\Models\Test;
+use App\Models\TestAnswer;
+use Filament\Actions\EditAction;
+use Filament\Infolists\Components\RepeatableEntry;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Support\Enums\FontWeight;
+use Illuminate\Support\HtmlString;
 
 class ViewResult extends ViewRecord
 {
@@ -26,7 +22,7 @@ class ViewResult extends ViewRecord
     {
         parent::mount($record);
 
-        $this->record->load('testAnswers.question.questionOptions');
+        $this->record->load('test_answers.question.questionOptions');
 
         $this->authorizeAccess();
 
@@ -55,11 +51,11 @@ class ViewResult extends ViewRecord
                         TextEntry::make('result')
                             ->inlineLabel()
                             ->formatStateUsing(function (Test $record) {
-                                return $record->result . '/' . $record->questions->count() . ' (time: ' . intval($record->time_spent / 60) . ':' . gmdate('s', $record->time_spent) . ' minutes)';
+                                return $record->result.'/'.$record->questions->count().' (time: '.intval($record->time_spent / 60).':'.gmdate('s', $record->time_spent).' minutes)';
                             }),
                     ]),
 
-                RepeatableEntry::make('testAnswers')
+                RepeatableEntry::make('test_answers')
                     ->label('Questions')
                     ->columnSpanFull()
                     ->schema([
@@ -79,20 +75,22 @@ class ViewResult extends ViewRecord
                                     $selectedOptions = $answer->option_id ? explode(',', $answer->option_id) : [];
                                     $correctOptions = $options->where('correct', true)->pluck('option')->toArray();
 
-                                    return new HtmlString('<strong>Your Answers:</strong> ' . implode(', ', $options->whereIn('id', $selectedOptions)->pluck('option')->toArray()) .
-                                        '<br><strong>Correct Answers:</strong> ' . implode(', ', $correctOptions));
+                                    return new HtmlString('<strong>Your Answers:</strong> '.implode(', ', $options->whereIn('id', $selectedOptions)->pluck('option')->toArray()).
+                                        '<br><strong>Correct Answers:</strong> '.implode(', ', $correctOptions));
                                 }
 
                                 // Handle Single Choice (Radio)
                                 if ($question->type === 'multiple_choice') {
                                     $selectedOption = $options->firstWhere('id', $answer->option_id);
-                                    return new HtmlString($selectedOption ? "<strong>Your Answer:</strong> {$selectedOption->option}" : "<strong>Your Answer:</strong> None") .
+
+                                    return new HtmlString($selectedOption ? "<strong>Your Answer:</strong> {$selectedOption->option}" : '<strong>Your Answer:</strong> None').
                                         ($selectedOption && $selectedOption->correct ? ' ✅' : ' ❌');
                                 }
 
                                 // Handle Single Answer (Text Input)
                                 if ($question->type === 'single_answer') {
                                     $correctAnswer = $question->correct_answer ?? 'Not Provided';
+
                                     return new HtmlString("<strong>Your Answer:</strong> {$answer->text_answer} <br><strong>Correct Answer:</strong> {$correctAnswer}");
                                 }
 
@@ -102,7 +100,7 @@ class ViewResult extends ViewRecord
                             ->inlineLabel()
                             ->label('Code Snippet')
                             ->visible(fn (?string $state): bool => ! is_null($state))
-                            ->formatStateUsing(fn ($state) => new HtmlString('<pre class="border-gray-100 bg-gray-50 p-2">' . htmlspecialchars($state) . '</pre>')),
+                            ->formatStateUsing(fn ($state) => new HtmlString('<pre class="border-gray-100 bg-gray-50 p-2">'.htmlspecialchars($state).'</pre>')),
                         TextEntry::make('question.more_info_link')
                             ->inlineLabel()
                             ->label('More Information')

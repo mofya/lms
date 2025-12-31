@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\FeedbackTiming;
 use App\Enums\NavigatorPosition;
 use App\Filament\Resources\QuizResource\Pages;
 use App\Models\Quiz;
@@ -67,7 +68,7 @@ class QuizResource extends Resource
                     ->columns(2),
 
                 Section::make('Duration Settings')
-                    ->description('Choose either duration per question OR total duration. Setting one will clear the other.')
+                    ->description('Choose either duration per question OR total duration.')
                     ->schema([
                         Forms\Components\TextInput::make('duration_per_question')
                             ->label('Duration Per Question (seconds)')
@@ -133,18 +134,64 @@ class QuizResource extends Resource
 
                         Forms\Components\Toggle::make('show_progress_bar')
                             ->label('Show Progress Bar')
-                            ->helperText('Display a progress bar showing quiz completion.')
                             ->default(true),
 
                         Forms\Components\Toggle::make('shuffle_questions')
                             ->label('Shuffle Questions')
-                            ->helperText('Randomize the order of questions for each attempt.')
                             ->default(true),
 
                         Forms\Components\Toggle::make('shuffle_options')
                             ->label('Shuffle Answer Options')
-                            ->helperText('Randomize the order of answer options for each question.')
                             ->default(true),
+                    ])
+                    ->columns(2),
+
+                Section::make('Question Pool')
+                    ->description('Configure random question selection from the question bank.')
+                    ->schema([
+                        Forms\Components\TextInput::make('questions_per_attempt')
+                            ->label('Questions Per Attempt')
+                            ->helperText('Number of random questions to show per attempt. Leave empty to show all.')
+                            ->numeric()
+                            ->nullable()
+                            ->minValue(1)
+                            ->columnSpanFull(),
+                    ]),
+
+                Section::make('Results & Feedback')
+                    ->description('Control what students see after completing the quiz.')
+                    ->schema([
+                        Forms\Components\Select::make('feedback_timing')
+                            ->label('When to Show Feedback')
+                            ->options(FeedbackTiming::options())
+                            ->default(FeedbackTiming::AfterSubmit->value)
+                            ->columnSpanFull(),
+
+                        Forms\Components\Toggle::make('show_correct_answers')
+                            ->label('Show Correct Answers')
+                            ->default(true),
+
+                        Forms\Components\Toggle::make('show_explanations')
+                            ->label('Show Explanations')
+                            ->default(true),
+                    ])
+                    ->columns(2),
+
+                Section::make('Passing Requirements')
+                    ->description('Set minimum score requirements for this quiz.')
+                    ->schema([
+                        Forms\Components\TextInput::make('passing_score')
+                            ->label('Passing Score (%)')
+                            ->helperText('Minimum percentage required to pass.')
+                            ->numeric()
+                            ->nullable()
+                            ->minValue(0)
+                            ->maxValue(100)
+                            ->suffix('%'),
+
+                        Forms\Components\Toggle::make('require_passing_to_proceed')
+                            ->label('Require Passing to Proceed')
+                            ->default(false),
                     ])
                     ->columns(2),
             ]);
@@ -165,9 +212,7 @@ class QuizResource extends Resource
                 Tables\Columns\IconColumn::make('is_published')
                     ->boolean(),
             ])
-            ->filters([
-                //
-            ])
+            ->filters([])
             ->recordActions([
                 EditAction::make(),
                 DeleteAction::make(),
@@ -181,9 +226,7 @@ class QuizResource extends Resource
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     public static function getPages(): array

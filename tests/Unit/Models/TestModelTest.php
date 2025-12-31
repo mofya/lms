@@ -36,7 +36,7 @@ class TestModelTest extends TestCase
         $test = Test::factory()->create();
         $answer = TestAnswer::factory()->create(['test_id' => $test->id]);
 
-        $this->assertTrue($test->testAnswers->contains($answer));
+        $this->assertTrue($test->test_answers->contains($answer));
     }
 
     public function test_calculate_score_with_correct_answers(): void

@@ -19,8 +19,8 @@ class ViewStudentResult extends ViewRecord
 
         $this->record->load([
             'quiz',
-            'testAnswers.question.questionOptions',
-            'testAnswers.option',
+            'test_answers.question.questionOptions',
+            'test_answers.option',
         ]);
 
         $this->authorizeAccess();
@@ -38,17 +38,17 @@ class ViewStudentResult extends ViewRecord
 
     public function getTotalQuestions(): int
     {
-        return $this->record->testAnswers->count();
+        return $this->record->test_answers->count();
     }
 
     public function getCorrectCount(): int
     {
-        return $this->record->testAnswers->where('correct', true)->count();
+        return $this->record->test_answers->where('correct', true)->count();
     }
 
     public function getWrongCount(): int
     {
-        return $this->record->testAnswers->where('correct', false)->count();
+        return $this->record->test_answers->where('correct', false)->count();
     }
 
     public function getScorePercentage(): float

@@ -221,7 +221,7 @@ class QuizTakingService
      */
     public function calculateScore(Test $test): array
     {
-        $answers = $test->testAnswers()
+        $answers = $test->test_answers()
             ->with(['question.questionOptions'])
             ->get();
 

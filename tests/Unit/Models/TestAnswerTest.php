@@ -134,9 +134,9 @@ class TestAnswerTest extends TestCase
         $answer2 = TestAnswer::factory()->create(['test_id' => $test->id]);
         $answer3 = TestAnswer::factory()->create(['test_id' => $test->id]);
 
-        $this->assertCount(3, $test->testAnswers);
-        $this->assertTrue($test->testAnswers->contains($answer1));
-        $this->assertTrue($test->testAnswers->contains($answer2));
-        $this->assertTrue($test->testAnswers->contains($answer3));
+        $this->assertCount(3, $test->test_answers);
+        $this->assertTrue($test->test_answers->contains($answer1));
+        $this->assertTrue($test->test_answers->contains($answer2));
+        $this->assertTrue($test->test_answers->contains($answer3));
     }
 }

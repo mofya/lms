@@ -267,7 +267,7 @@ class QuizTakingServiceTest extends TestCase
         $answer = $this->service->saveAnswer($test, $question->id, $option2->id);
 
         $this->assertEquals($option2->id, $answer->option_id);
-        $this->assertCount(1, $test->testAnswers);
+        $this->assertCount(1, $test->test_answers);
     }
 
     public function test_save_answer_throws_for_invalid_question(): void

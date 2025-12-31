@@ -87,7 +87,7 @@
         <div class="space-y-4">
             <h3 class="text-xl font-bold text-gray-900 dark:text-white">Question Breakdown</h3>
 
-            @foreach ($this->record->testAnswers as $index => $testAnswer)
+            @foreach ($this->record->test_answers as $index => $testAnswer)
                 @php
                     $question = $testAnswer->question;
                     $isCorrect = $testAnswer->correct;
