@@ -16,7 +16,7 @@ class AiStudyAssistant
     public function askQuestion(string $question, ?Course $course = null, string $provider = 'openai'): array|string
     {
         $prompt = $this->buildPrompt($question, $course);
-        
+
         return match ($provider) {
             'openai' => $this->callOpenAI($prompt),
             'anthropic' => $this->callAnthropic($prompt),
@@ -28,16 +28,16 @@ class AiStudyAssistant
     protected function buildPrompt(string $question, ?Course $course): string
     {
         $prompt = "You are an AI study assistant helping a student with their coursework.\n\n";
-        
+
         if ($course) {
             $prompt .= "COURSE CONTEXT:\n";
             $prompt .= "Course: {$course->title}\n";
-            
+
             if ($course->description) {
-                $description = is_array($course->description) 
+                $description = is_array($course->description)
                     ? strip_tags(json_encode($course->description))
                     : strip_tags($course->description);
-                $prompt .= "Description: " . substr($description, 0, 500) . "\n";
+                $prompt .= 'Description: '.substr($description, 0, 500)."\n";
             }
 
             // Include lesson content summaries
@@ -45,8 +45,8 @@ class AiStudyAssistant
             if ($lessons->isNotEmpty()) {
                 $prompt .= "\nRelevant Course Content:\n";
                 foreach ($lessons as $lesson) {
-                    $content = strip_tags($lesson->lesson_text ?? '');
-                    $prompt .= "- {$lesson->title}: " . substr($content, 0, 200) . "...\n";
+                    $content = $this->extractTextFromLessonContent($lesson->lesson_text);
+                    $prompt .= "- {$lesson->title}: ".substr($content, 0, 200)."...\n";
                 }
             }
 
@@ -62,7 +62,7 @@ class AiStudyAssistant
 
         $prompt .= "\n\nSTUDENT QUESTION:\n";
         $prompt .= $question;
-        
+
         $prompt .= "\n\nPlease provide a helpful, educational response. If the question is about course content, reference the relevant materials. Be concise but thorough.";
 
         return $prompt;
@@ -145,5 +145,57 @@ class AiStudyAssistant
         }
 
         return $response->json('candidates.0.content.parts.0.text') ?? 'No response received.';
+    }
+
+    /**
+     * Extract plain text from Tiptap/ProseMirror document structure
+     */
+    protected function extractTextFromLessonContent(mixed $content): string
+    {
+        if (is_null($content)) {
+            return '';
+        }
+
+        if (is_string($content)) {
+            return strip_tags($content);
+        }
+
+        if (! is_array($content)) {
+            return '';
+        }
+
+        $text = '';
+
+        // Handle Tiptap document structure
+        if (isset($content['content']) && is_array($content['content'])) {
+            foreach ($content['content'] as $node) {
+                $text .= $this->extractTextFromNode($node);
+            }
+        } elseif (isset($content['text'])) {
+            $text = $content['text'];
+        }
+
+        return trim($text);
+    }
+
+    /**
+     * Recursively extract text from a Tiptap node
+     */
+    protected function extractTextFromNode(array $node): string
+    {
+        $text = '';
+
+        if (isset($node['text'])) {
+            $text .= $node['text'];
+        }
+
+        if (isset($node['content']) && is_array($node['content'])) {
+            foreach ($node['content'] as $child) {
+                $text .= $this->extractTextFromNode($child);
+            }
+            $text .= ' '; // Add space between blocks
+        }
+
+        return $text;
     }
 }

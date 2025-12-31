@@ -16,9 +16,9 @@ class TestFactory extends Factory
         return [
             'user_id' => User::factory(),
             'quiz_id' => Quiz::factory(),
-            'result' => 0,
+            'result' => null,
             'ip_address' => fake()->ipv4(),
-            'time_spent' => fake()->numberBetween(60, 3600),
+            'time_spent' => null,
             'attempt_number' => 1,
             'started_at' => now(),
             'submitted_at' => null,
