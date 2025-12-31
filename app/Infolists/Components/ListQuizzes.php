@@ -2,24 +2,41 @@
 
 namespace App\Infolists\Components;
 
-use Filament\Schemas\Components\Component;
 use App\Models\Quiz;
-use Illuminate\Database\Eloquent\Collection;
+use App\Services\QuizTakingService;
+use Filament\Schemas\Components\Component;
+use Illuminate\Support\Collection;
 
 class ListQuizzes extends Component
 {
     protected string $view = 'filament.infolists.components.list-quizzes';
 
-    public ?Collection $quizzes = null;
+    public ?Collection $quizzesWithStatus = null;
 
     public static function make(string $name): static
     {
-        return new static();
+        return new static;
     }
 
     public function course($course): static
     {
-        $this->quizzes = Quiz::where('course_id', $course->id)->get();
+        $user = auth()->user();
+        $quizService = app(QuizTakingService::class);
+
+        $quizzes = Quiz::where('course_id', $course->id)
+            ->published()
+            ->withCount('questions')
+            ->get();
+
+        // Build quiz data with status for each quiz
+        $this->quizzesWithStatus = $quizzes->map(function (Quiz $quiz) use ($user, $quizService) {
+            $status = $user ? $quizService->getQuizStatusForUser($user, $quiz) : null;
+
+            return [
+                'quiz' => $quiz,
+                'status' => $status,
+            ];
+        });
 
         return $this->configure();
     }
@@ -28,15 +45,13 @@ class ListQuizzes extends Component
     {
         parent::setUp();
 
-        // Ensure the data is correctly passed to the view
         $this->configure();
     }
 
     public function configure(): static
     {
-//        dd($this->quizzes);
         $this->viewData([
-            'quizzes' => $this->quizzes ?? collect(), // Ensure it's always a collection
+            'quizzesWithStatus' => $this->quizzesWithStatus ?? collect(),
         ]);
 
         return $this;

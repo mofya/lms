@@ -334,4 +334,57 @@ class QuizTakingService
             ->orderBy('submitted_at', 'desc')
             ->first();
     }
+
+    /**
+     * Get comprehensive quiz status for a user.
+     *
+     * Returns all information needed to display quiz cards in a list.
+     */
+    public function getQuizStatusForUser(User $user, Quiz $quiz): array
+    {
+        $attempts = Test::query()
+            ->where('user_id', $user->id)
+            ->where('quiz_id', $quiz->id)
+            ->get();
+
+        $inProgress = $attempts->whereNull('submitted_at')->first();
+        $submittedAttempts = $attempts->whereNotNull('submitted_at');
+        $lastSubmitted = $submittedAttempts->sortByDesc('submitted_at')->first();
+        $bestAttempt = $submittedAttempts->sortByDesc('result')->first();
+        $attemptsUsed = $submittedAttempts->count();
+
+        $canAttempt = $this->canUserAttemptQuiz($user, $quiz);
+        $remainingAttempts = $this->getRemainingAttempts($user, $quiz);
+
+        // Calculate best score percentage
+        $bestScorePercentage = null;
+        if ($bestAttempt) {
+            $totalQuestions = $quiz->questions()->count();
+            if ($totalQuestions > 0) {
+                $bestScorePercentage = round(($bestAttempt->result / $totalQuestions) * 100);
+            }
+        }
+
+        // Calculate last score percentage
+        $lastScorePercentage = null;
+        if ($lastSubmitted) {
+            $totalQuestions = $quiz->questions()->count();
+            if ($totalQuestions > 0) {
+                $lastScorePercentage = round(($lastSubmitted->result / $totalQuestions) * 100);
+            }
+        }
+
+        return [
+            'in_progress' => $inProgress,
+            'last_submitted' => $lastSubmitted,
+            'best_attempt' => $bestAttempt,
+            'attempts_used' => $attemptsUsed,
+            'attempts_allowed' => $quiz->attempts_allowed,
+            'remaining_attempts' => $remainingAttempts,
+            'can_attempt' => $canAttempt,
+            'has_attempted' => $attemptsUsed > 0,
+            'best_score_percentage' => $bestScorePercentage,
+            'last_score_percentage' => $lastScorePercentage,
+        ];
+    }
 }

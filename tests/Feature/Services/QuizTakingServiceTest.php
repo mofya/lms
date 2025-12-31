@@ -459,4 +459,115 @@ class QuizTakingServiceTest extends TestCase
 
         $this->assertEquals($newer->id, $latest->id);
     }
+
+    public function test_get_quiz_status_for_user_with_no_attempts(): void
+    {
+        $user = User::factory()->create();
+        $quiz = Quiz::factory()->withAttempts(3)->create();
+        Question::factory()->count(5)->create()->each(fn ($q) => $quiz->questions()->attach($q));
+
+        $status = $this->service->getQuizStatusForUser($user, $quiz);
+
+        $this->assertNull($status['in_progress']);
+        $this->assertNull($status['last_submitted']);
+        $this->assertNull($status['best_attempt']);
+        $this->assertEquals(0, $status['attempts_used']);
+        $this->assertEquals(3, $status['attempts_allowed']);
+        $this->assertEquals(3, $status['remaining_attempts']);
+        $this->assertTrue($status['can_attempt']);
+        $this->assertFalse($status['has_attempted']);
+        $this->assertNull($status['best_score_percentage']);
+        $this->assertNull($status['last_score_percentage']);
+    }
+
+    public function test_get_quiz_status_for_user_with_in_progress_attempt(): void
+    {
+        $user = User::factory()->create();
+        $quiz = Quiz::factory()->withAttempts(3)->create();
+        Question::factory()->count(5)->create()->each(fn ($q) => $quiz->questions()->attach($q));
+
+        $inProgress = Test::factory()->inProgress()->create([
+            'user_id' => $user->id,
+            'quiz_id' => $quiz->id,
+        ]);
+
+        $status = $this->service->getQuizStatusForUser($user, $quiz);
+
+        $this->assertNotNull($status['in_progress']);
+        $this->assertEquals($inProgress->id, $status['in_progress']->id);
+        $this->assertTrue($status['can_attempt']);
+        $this->assertFalse($status['has_attempted']);
+        $this->assertEquals(0, $status['attempts_used']);
+    }
+
+    public function test_get_quiz_status_for_user_with_completed_attempts(): void
+    {
+        $user = User::factory()->create();
+        $quiz = Quiz::factory()->withAttempts(3)->create();
+        Question::factory()->count(5)->create()->each(fn ($q) => $quiz->questions()->attach($q));
+
+        // Create two completed attempts with different scores
+        $lowScore = Test::factory()->submitted()->create([
+            'user_id' => $user->id,
+            'quiz_id' => $quiz->id,
+            'result' => 2,
+            'submitted_at' => now()->subHour(),
+        ]);
+        $highScore = Test::factory()->submitted()->create([
+            'user_id' => $user->id,
+            'quiz_id' => $quiz->id,
+            'result' => 4,
+            'submitted_at' => now(),
+        ]);
+
+        $status = $this->service->getQuizStatusForUser($user, $quiz);
+
+        $this->assertNull($status['in_progress']);
+        $this->assertEquals($highScore->id, $status['last_submitted']->id);
+        $this->assertEquals($highScore->id, $status['best_attempt']->id);
+        $this->assertEquals(2, $status['attempts_used']);
+        $this->assertEquals(1, $status['remaining_attempts']);
+        $this->assertTrue($status['can_attempt']);
+        $this->assertTrue($status['has_attempted']);
+        $this->assertEquals(80, $status['best_score_percentage']); // 4/5 = 80%
+        $this->assertEquals(80, $status['last_score_percentage']); // 4/5 = 80%
+    }
+
+    public function test_get_quiz_status_for_user_at_attempt_limit(): void
+    {
+        $user = User::factory()->create();
+        $quiz = Quiz::factory()->withAttempts(2)->create();
+        Question::factory()->count(5)->create()->each(fn ($q) => $quiz->questions()->attach($q));
+
+        // Create max attempts
+        Test::factory()->count(2)->submitted()->create([
+            'user_id' => $user->id,
+            'quiz_id' => $quiz->id,
+        ]);
+
+        $status = $this->service->getQuizStatusForUser($user, $quiz);
+
+        $this->assertFalse($status['can_attempt']);
+        $this->assertEquals(0, $status['remaining_attempts']);
+        $this->assertEquals(2, $status['attempts_used']);
+    }
+
+    public function test_get_quiz_status_for_user_with_unlimited_attempts(): void
+    {
+        $user = User::factory()->create();
+        $quiz = Quiz::factory()->create(['attempts_allowed' => null]);
+        Question::factory()->count(5)->create()->each(fn ($q) => $quiz->questions()->attach($q));
+
+        Test::factory()->count(10)->submitted()->create([
+            'user_id' => $user->id,
+            'quiz_id' => $quiz->id,
+        ]);
+
+        $status = $this->service->getQuizStatusForUser($user, $quiz);
+
+        $this->assertTrue($status['can_attempt']);
+        $this->assertNull($status['remaining_attempts']);
+        $this->assertNull($status['attempts_allowed']);
+        $this->assertEquals(10, $status['attempts_used']);
+    }
 }
