@@ -10,6 +10,8 @@ class RubricCriteria extends Model
 {
     use HasFactory;
 
+    protected $table = 'rubric_criteria';
+
     protected $fillable = [
         'rubric_id',
         'name',

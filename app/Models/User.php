@@ -108,7 +108,7 @@ class User extends Authenticatable implements FilamentUser
         $this->completedLessons()->detach($lesson);
         $courseLessons = $lesson->course->lessons()->pluck('id')->toArray();
 
-        if (! $this->completedLessons()->whereIn('id', $courseLessons)->exists()) {
+        if (! $this->completedLessons()->whereIn('lessons.id', $courseLessons)->exists()) {
             $this->courses()->detach($lesson->course_id);
         }
     }
@@ -126,5 +126,12 @@ class User extends Authenticatable implements FilamentUser
     public function certificates(): HasMany
     {
         return $this->hasMany(Certificate::class);
+    }
+
+    public function badges(): BelongsToMany
+    {
+        return $this->belongsToMany(Badge::class, 'user_badges')
+            ->withPivot('earned_at')
+            ->withTimestamps();
     }
 }

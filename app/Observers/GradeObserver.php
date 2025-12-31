@@ -9,13 +9,24 @@ use App\Models\AssignmentSubmission;
 class GradeObserver
 {
     /**
-     * Handle the Test "created" event.
+     * Handle the "created" event for both Test and AssignmentSubmission.
      */
-    public function created(Test $test): void
+    public function created(Test|AssignmentSubmission $model): void
+    {
+        if ($model instanceof Test) {
+            $this->handleTestCreated($model);
+        }
+        // AssignmentSubmission creation doesn't trigger grade recalculation
+    }
+
+    /**
+     * Handle Test creation specifically.
+     */
+    protected function handleTestCreated(Test $test): void
     {
         if ($test->quiz && $test->quiz->course) {
             $this->updateGradeForUserCourse($test->user, $test->quiz->course);
-            
+
             // Award XP for quiz completion
             $totalQuestions = $test->quiz->questions()->count();
             (new \App\Services\XpService())->awardQuizCompletion($test->user, $test->score, $totalQuestions);
@@ -26,11 +37,13 @@ class GradeObserver
     /**
      * Handle the AssignmentSubmission "updated" event.
      */
-    public function updated(AssignmentSubmission $submission): void
+    public function updated(Test|AssignmentSubmission $model): void
     {
-        // Only recalculate if status changed to graded/approved
-        if ($submission->isDirty('status') && $submission->isGraded() && $submission->assignment && $submission->assignment->course) {
-            $this->updateGradeForUserCourse($submission->user, $submission->assignment->course);
+        if ($model instanceof AssignmentSubmission) {
+            // Only recalculate if status changed to graded/approved
+            if ($model->isDirty('status') && $model->isGraded() && $model->assignment && $model->assignment->course) {
+                $this->updateGradeForUserCourse($model->user, $model->assignment->course);
+            }
         }
     }
 

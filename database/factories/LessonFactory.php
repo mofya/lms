@@ -9,26 +9,43 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 class LessonFactory extends Factory
 {
     protected $model = Lesson::class;
-    // Initialize a static counter for the position
-    protected static $position = 1;
-    public function definition()
-    {
-        $faker = app(\Faker\Generator::class);
 
+    protected static int $position = 1;
+
+    public function definition(): array
+    {
         return [
-            'title' => $faker->promptAI('Generate a lesson title on web development'),
-            'lesson_text' => $faker->promptAI('Provide a brief lesson text for a web development topic'),
+            'title' => fake()->sentence(3),
+            'lesson_text' => fake()->paragraphs(3, true),
             'course_id' => Course::factory(),
             'position' => self::$position++,
+            'is_published' => false,
+            'type' => Lesson::TYPE_TEXT,
+            'video_url' => null,
+            'duration_seconds' => null,
         ];
     }
 
-    public function published(): Factory
+    public function published(): static
     {
-        return $this->state(function (array $attributes) {
-            return [
-                'is_published' => true,
-            ];
-        });
+        return $this->state(fn (array $attributes) => [
+            'is_published' => true,
+        ]);
+    }
+
+    public function video(string $url = null): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'type' => Lesson::TYPE_VIDEO,
+            'video_url' => $url ?? 'https://example.com/video.mp4',
+            'duration_seconds' => fake()->numberBetween(300, 3600),
+        ]);
+    }
+
+    public function atPosition(int $position): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'position' => $position,
+        ]);
     }
 }

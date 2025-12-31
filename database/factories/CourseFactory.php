@@ -5,46 +5,32 @@ namespace Database\Factories;
 use App\Models\Course;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Facades\Storage;
 
 class CourseFactory extends Factory
 {
     protected $model = Course::class;
 
-    public function definition()
+    public function definition(): array
     {
-        $faker = app(\Faker\Generator::class);
-
         return [
-            'title' => $faker->promptAI('Generate a course title on web development'),
-            'description' => $faker->promptAI('Provide a brief description for a web development course'),
-            'lecturer_id' => User::where('is_admin', true)->inRandomOrder()->first()?->id ?? User::factory()->create(['is_admin' => true])->id,
+            'title' => fake()->sentence(3),
+            'description' => fake()->paragraph(),
+            'lecturer_id' => User::factory()->admin(),
+            'is_published' => false,
         ];
     }
 
-    public function published(): Factory
+    public function published(): static
     {
-        return $this->state(function (array $attributes) {
-            return [
-                'is_published' => true,
-            ];
-        });
+        return $this->state(fn (array $attributes) => [
+            'is_published' => true,
+        ]);
     }
 
-    public function configure(): static
+    public function forLecturer(User $lecturer): static
     {
-        return $this->afterCreating(function (Course $course) {
-            // Check if the storage disk is set up correctly
-            $images = collect(Storage::disk('public')->files('demo-images'));
-
-            if ($images->isNotEmpty()) {
-                // Ensure media library methods are compatible with Filament v3
-                $course->addMedia(storage_path("app/public/" . $images->random()))
-                    ->preservingOriginal()
-                    ->toMediaCollection('featured_image');
-            } else {
-                \Log::warning('No images found in storage/app/public/demo-images directory.');
-            }
-        });
+        return $this->state(fn (array $attributes) => [
+            'lecturer_id' => $lecturer->id,
+        ]);
     }
 }

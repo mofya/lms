@@ -29,6 +29,11 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            'is_admin' => false,
+            'xp_points' => 0,
+            'level' => 1,
+            'current_streak' => 0,
+            'last_activity_date' => null,
         ];
     }
 
@@ -39,6 +44,38 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /**
+     * Indicate that the user is an admin.
+     */
+    public function admin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_admin' => true,
+        ]);
+    }
+
+    /**
+     * Set specific XP and level.
+     */
+    public function withXp(int $xp): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'xp_points' => $xp,
+            'level' => max(1, floor($xp / 100) + 1),
+        ]);
+    }
+
+    /**
+     * Set a streak.
+     */
+    public function withStreak(int $days): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'current_streak' => $days,
+            'last_activity_date' => now()->subDay(),
         ]);
     }
 }

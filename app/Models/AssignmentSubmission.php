@@ -59,8 +59,9 @@ class AssignmentSubmission extends Model
             return false;
         }
 
-        $deadline = $this->assignment->late_due_at ?? $this->assignment->due_at;
-        return now()->gt($deadline);
+        // A submission is late if it's after the due date
+        // (even if still within the late period grace window)
+        return now()->gt($this->assignment->due_at);
     }
 
     public function isGraded(): bool
