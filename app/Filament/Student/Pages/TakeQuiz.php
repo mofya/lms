@@ -7,15 +7,16 @@ use App\Filament\Student\Resources\StudentResultResource;
 use App\Models\Question;
 use App\Models\Quiz;
 use App\Models\Test;
-use App\Models\TestAnswer;
+use App\Services\QuizTakingService;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Panel;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany as Builder;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 
 class TakeQuiz extends Page
 {
@@ -23,10 +24,14 @@ class TakeQuiz extends Page
 
     protected string $view = 'filament.student.pages.take-quiz';
 
+    protected QuizTakingService $quizService;
+
     #[Locked]
     public Model|int|string|null $record;
 
     public Quiz $quiz;
+
+    public ?Test $test = null;
 
     public Collection $questions;
 
@@ -42,7 +47,14 @@ class TakeQuiz extends Page
 
     public ?int $startTimeSeconds = null;
 
-    public ?int $attemptNumber = null;
+    public ?int $remainingSeconds = null;
+
+    public bool $isSaving = false;
+
+    public function boot(QuizTakingService $quizService): void
+    {
+        $this->quizService = $quizService;
+    }
 
     public function mount(int|string $record): void
     {
@@ -61,53 +73,95 @@ class TakeQuiz extends Page
             'You are not enrolled in this course.'
         );
 
-        $attemptsSoFar = $this->record->tests()->where('user_id', auth()->id())->count();
-        abort_if(
-            $attemptsSoFar >= $this->record->attempts_allowed,
-            403,
-            'You have reached the maximum number of attempts for this quiz.'
-        );
-        $this->attemptNumber = $attemptsSoFar + 1;
+        // Check if user can attempt this quiz
+        if (! $this->quizService->canUserAttemptQuiz(auth()->user(), $this->record)) {
+            abort(403, 'You have reached the maximum number of attempts for this quiz.');
+        }
 
         $this->quiz = $this->record;
 
-        $questionsQuery = $this->record->questions();
+        // Get or create an attempt (supports resume)
+        $this->test = $this->quizService->getOrCreateAttempt(auth()->user(), $this->record);
 
-        if ($this->record->shuffle_questions) {
-            $questionsQuery->inRandomOrder();
-        }
-
-        if ($this->record->shuffle_options) {
-            $questionsQuery->with(['questionOptions' => fn (Builder $query) => $query->inRandomOrder()]);
-        } else {
-            $questionsQuery->with('questionOptions');
-        }
-
-        $this->questions = $questionsQuery->get();
+        // Prepare questions
+        $this->questions = $this->quizService->prepareQuizQuestions($this->record);
 
         if ($this->questions->isEmpty()) {
             abort(404, 'This quiz has no questions.');
         }
 
+        // Load question options with optional shuffling
+        $this->questions = $this->questions->map(function ($question) {
+            if ($this->record->shuffle_options) {
+                $question->setRelation(
+                    'questionOptions',
+                    $question->questionOptions->shuffle()
+                );
+            }
+
+            return $question;
+        });
+
         $this->currentQuestion = $this->questions[0];
 
+        // Initialize answers array with existing answers (for resume)
+        $this->initializeAnswers();
+
+        // Set up timing
+        $this->setupTiming();
+    }
+
+    protected function initializeAnswers(): void
+    {
+        // Load existing answers from database
+        $existingAnswers = $this->test->testAnswers()
+            ->get()
+            ->keyBy('question_id');
+
         $this->questionsAnswers = [];
+
         foreach ($this->questions as $index => $question) {
-            if ($question->type === 'checkbox') {
-                $this->questionsAnswers[$index] = [];
-            } elseif ($question->type === 'single_answer') {
-                $this->questionsAnswers[$index] = '';
+            $existingAnswer = $existingAnswers->get($question->id);
+
+            if ($existingAnswer) {
+                if ($question->type === 'checkbox') {
+                    $this->questionsAnswers[$index] = json_decode($existingAnswer->user_answer ?? '[]', true) ?? [];
+                } elseif ($question->type === 'single_answer') {
+                    $this->questionsAnswers[$index] = $existingAnswer->user_answer ?? '';
+                } else {
+                    $this->questionsAnswers[$index] = $existingAnswer->option_id;
+                }
             } else {
-                $this->questionsAnswers[$index] = null;
+                if ($question->type === 'checkbox') {
+                    $this->questionsAnswers[$index] = [];
+                } elseif ($question->type === 'single_answer') {
+                    $this->questionsAnswers[$index] = '';
+                } else {
+                    $this->questionsAnswers[$index] = null;
+                }
             }
         }
+    }
 
-        if ($this->record->total_duration && $this->record->total_duration > 0) {
-            $this->totalDuration = $this->record->total_duration;
+    protected function setupTiming(): void
+    {
+        if ($this->record->shouldUseTotalDuration()) {
+            $this->totalDuration = $this->record->total_duration * 60; // Convert to seconds
             $this->secondsPerQuestion = null;
+
+            // Calculate remaining time based on when quiz started
+            $remainingFromService = $this->quizService->getRemainingTimeSeconds($this->test);
+            $this->remainingSeconds = $remainingFromService ?? $this->totalDuration;
+
+            if ($this->remainingSeconds <= 0) {
+                $this->autoSubmit();
+
+                return;
+            }
         } else {
             $this->totalDuration = null;
             $this->secondsPerQuestion = $this->record->duration_per_question ?? 60;
+            $this->remainingSeconds = null;
         }
 
         $this->startTimeSeconds = now()->timestamp;
@@ -154,6 +208,10 @@ class TakeQuiz extends Page
 
     public function updatedQuestionsAnswers($value, $key): void
     {
+        // Save answer to database in real-time
+        $this->saveCurrentAnswer($key);
+
+        // Auto-advance if enabled for multiple choice
         if ($this->quiz->auto_advance_on_answer) {
             $question = $this->questions[$this->currentQuestionIndex];
 
@@ -167,22 +225,13 @@ class TakeQuiz extends Page
         }
     }
 
-    public function submit(): void
+    protected function saveCurrentAnswer(int $questionIndex): void
     {
-        $result = 0;
-        $timeSpent = now()->timestamp - ($this->startTimeSeconds ?? now()->timestamp);
+        $this->isSaving = true;
 
-        $test = Test::create([
-            'user_id' => auth()->id(),
-            'quiz_id' => $this->record->id,
-            'result' => 0,
-            'ip_address' => request()->ip(),
-            'time_spent' => $timeSpent,
-            'attempt_number' => $this->attemptNumber ?? 1,
-        ]);
-
-        foreach ($this->questionsAnswers as $key => $rawAnswer) {
-            $question = $this->questions[$key];
+        try {
+            $question = $this->questions[$questionIndex];
+            $rawAnswer = $this->questionsAnswers[$questionIndex] ?? null;
 
             $optionId = null;
             $userAnswer = null;
@@ -195,26 +244,53 @@ class TakeQuiz extends Page
                 $userAnswer = $rawAnswer;
             }
 
-            $answer = TestAnswer::create([
-                'user_id' => auth()->id(),
-                'test_id' => $test->id,
-                'question_id' => $question->id,
-                'option_id' => $optionId,
-                'user_answer' => $userAnswer,
-                'correct' => false,
-            ]);
-
-            $isCorrect = $question->evaluateAnswer($answer);
-            $answer->update(['correct' => $isCorrect]);
-
-            if ($isCorrect) {
-                $result++;
+            if ($optionId || $userAnswer) {
+                $this->quizService->saveAnswer($this->test, $question->id, $optionId, $userAnswer);
             }
+
+            $this->dispatch('answer-saved');
+        } catch (\Exception $e) {
+            Notification::make()
+                ->title('Failed to save answer')
+                ->body('Please try again.')
+                ->danger()
+                ->send();
+        } finally {
+            $this->isSaving = false;
         }
+    }
 
-        $test->update(['result' => $result]);
+    #[On('timer-expired')]
+    public function autoSubmit(): void
+    {
+        Notification::make()
+            ->title('Time expired!')
+            ->body('Your quiz has been automatically submitted.')
+            ->warning()
+            ->send();
 
-        $this->redirectIntended(StudentResultResource::getUrl('view', ['record' => $test]));
+        $this->submit();
+    }
+
+    public function submit(): void
+    {
+        try {
+            // Submit the quiz using the service
+            $this->test = $this->quizService->submitQuiz($this->test);
+
+            Notification::make()
+                ->title('Quiz submitted successfully!')
+                ->success()
+                ->send();
+
+            $this->redirectIntended(StudentResultResource::getUrl('view', ['record' => $this->test]));
+        } catch (\Exception $e) {
+            Notification::make()
+                ->title('Submission failed')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+        }
     }
 
     public function getHeading(): string|Htmlable
@@ -274,14 +350,28 @@ class TakeQuiz extends Page
         return $this->quiz->navigator_position?->value ?? NavigatorPosition::Bottom->value;
     }
 
+    #[Computed]
+    public function remainingAttemptsCount(): ?int
+    {
+        return $this->quizService->getRemainingAttempts(auth()->user(), $this->quiz);
+    }
+
+    #[Computed]
+    public function attemptNumber(): int
+    {
+        return $this->test?->attempt_number ?? 1;
+    }
+
     protected function getViewData(): array
     {
         return [
             'quiz' => $this->record,
+            'test' => $this->test,
             'currentQuestion' => $this->currentQuestion ?? null,
-            'totalDuration' => $this->shouldUseTotalDuration() ? $this->record->total_duration : null,
+            'totalDuration' => $this->shouldUseTotalDuration() ? $this->remainingSeconds : null,
             'secondsPerQuestion' => ! $this->shouldUseTotalDuration() ? $this->record->duration_per_question : null,
             'navigatorPosition' => $this->getNavigatorPosition(),
+            'isSaving' => $this->isSaving,
         ];
     }
 }

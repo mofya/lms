@@ -90,10 +90,12 @@ class TakeQuizPageTest extends TestCase
     {
         $this->actingAs($this->student);
 
+        // Create submitted attempts (only submitted attempts count toward limit)
         for ($i = 0; $i < $this->quiz->attempts_allowed; $i++) {
-            Test::factory()->create([
+            Test::factory()->submitted()->create([
                 'user_id' => $this->student->id,
                 'quiz_id' => $this->quiz->id,
+                'attempt_number' => $i + 1,
             ]);
         }
 
