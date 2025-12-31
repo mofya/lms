@@ -68,12 +68,47 @@ class Course extends Model implements HasMedia
 
     public function setDescriptionAttribute($value)
     {
-        // Store as JSON string if it's an array, otherwise store as-is
         if (is_array($value)) {
             $this->attributes['description'] = json_encode($value);
         } else {
             $this->attributes['description'] = $value;
         }
+    }
+
+    public function getDescriptionTextAttribute(): ?string
+    {
+        $description = $this->description;
+
+        if (is_null($description)) {
+            return null;
+        }
+
+        if (is_string($description)) {
+            return $description;
+        }
+
+        if (is_array($description)) {
+            return $this->extractTextFromTiptap($description);
+        }
+
+        return null;
+    }
+
+    private function extractTextFromTiptap(array $content): string
+    {
+        $text = '';
+
+        if (isset($content['text'])) {
+            return $content['text'];
+        }
+
+        if (isset($content['content']) && is_array($content['content'])) {
+            foreach ($content['content'] as $node) {
+                $text .= $this->extractTextFromTiptap($node);
+            }
+        }
+
+        return $text;
     }
 
     public function scopePublished(Builder $query): void
@@ -110,16 +145,17 @@ class Course extends Model implements HasMedia
     {
         return $this->lessons()->published();
     }
+
     public function progress(): array
     {
-        $lessons   = $this->publishedLessons;
+        $lessons = $this->publishedLessons;
         $completed = auth()->user()->completedLessons()
             ->whereIn('lesson_id', $lessons->pluck('id'))
             ->count();
 
         return [
-            'value'      => $completed,
-            'max'        => $lessons->count(),
+            'value' => $completed,
+            'max' => $lessons->count(),
             'percentage' => (int) floor(($completed / max(1, $lessons->count())) * 100),
         ];
     }

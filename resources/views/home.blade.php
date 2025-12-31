@@ -6,7 +6,7 @@
                 <div class="bg-white border rounded p-3">
                     <img src="{{ $course->getFirstMediaUrl('featured_image') }}" alt="" class="rounded object-cover w-full h-auto aspect-video">
                     <div class="font-semibold text-lg">{{ $course->title }}</div>
-                    <div class="mt-2">{{ $course->description }}</div>
+                    <div class="mt-2">{{ $course->description_text }}</div>
                 </div>
             </a>
         @endforeach

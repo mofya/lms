@@ -2,7 +2,7 @@
     <div class="grid grid-cols-3">
         <div class="col-span-2">
             <h1 class="text-3xl font-semibold">{{ $course->title }}</h1>
-            <div class="mt-4">{!! $course->description !!}</div>
+            <div class="mt-4">{{ $course->description_text }}</div>
         </div>
         <div class="flex flex-col space-y-0.5">
             @foreach($lessons as $index => $lesson)

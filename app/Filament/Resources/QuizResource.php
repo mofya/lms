@@ -2,23 +2,22 @@
 
 namespace App\Filament\Resources;
 
-use BackedEnum;
-use UnitEnum;
+use App\Enums\NavigatorPosition;
 use App\Filament\Resources\QuizResource\Pages;
-use App\Filament\Resources\QuizResource\RelationManagers;
 use App\Models\Quiz;
+use BackedEnum;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
 use Filament\Forms;
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Actions\EditAction;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
+use UnitEnum;
 
 class QuizResource extends Resource
 {
@@ -104,6 +103,50 @@ class QuizResource extends Resource
                             ->default(3)
                             ->columnSpanFull(),
                     ]),
+
+                Section::make('Display Settings')
+                    ->description('Configure how the quiz is presented to students.')
+                    ->schema([
+                        Forms\Components\Toggle::make('show_one_question_at_a_time')
+                            ->label('One Question Per Page')
+                            ->helperText('Show questions one at a time instead of all at once.')
+                            ->default(true),
+
+                        Forms\Components\Select::make('navigator_position')
+                            ->label('Question Navigator Position')
+                            ->options(NavigatorPosition::options())
+                            ->default(NavigatorPosition::Bottom->value)
+                            ->helperText('Where to display the question navigation grid.')
+                            ->visible(fn (Get $get): bool => $get('show_one_question_at_a_time')),
+
+                        Forms\Components\Toggle::make('allow_question_navigation')
+                            ->label('Allow Question Navigation')
+                            ->helperText('Allow students to navigate back to previous questions.')
+                            ->default(true)
+                            ->visible(fn (Get $get): bool => $get('show_one_question_at_a_time')),
+
+                        Forms\Components\Toggle::make('auto_advance_on_answer')
+                            ->label('Auto-Advance After Answer')
+                            ->helperText('Automatically move to next question after selecting an answer.')
+                            ->default(false)
+                            ->visible(fn (Get $get): bool => $get('show_one_question_at_a_time')),
+
+                        Forms\Components\Toggle::make('show_progress_bar')
+                            ->label('Show Progress Bar')
+                            ->helperText('Display a progress bar showing quiz completion.')
+                            ->default(true),
+
+                        Forms\Components\Toggle::make('shuffle_questions')
+                            ->label('Shuffle Questions')
+                            ->helperText('Randomize the order of questions for each attempt.')
+                            ->default(true),
+
+                        Forms\Components\Toggle::make('shuffle_options')
+                            ->label('Shuffle Answer Options')
+                            ->helperText('Randomize the order of answer options for each question.')
+                            ->default(true),
+                    ])
+                    ->columns(2),
             ]);
     }
 
@@ -113,7 +156,7 @@ class QuizResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('title'),
                 Tables\Columns\TextColumn::make('course.title')
-                ->label('Course')
+                    ->label('Course')
                     ->sortable()
                     ->searchable(),
                 Tables\Columns\TextColumn::make('attempts_allowed'),

@@ -2,137 +2,223 @@
     <div
         x-data="{
             secondsLeft: {{ $quiz->shouldUseTotalDuration() ? $quiz->total_duration : $quiz->duration_per_question ?? 60 }},
-            totalTimeMode: {{ $quiz->shouldUseTotalDuration() ? 'true' : 'false' }}
+            totalTimeMode: {{ $quiz->shouldUseTotalDuration() ? 'true' : 'false' }},
+            formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${mins}:${secs.toString().padStart(2, '0')}`;
+            }
         }"
         x-init="setInterval(() => {
             if (totalTimeMode) {
                 if (secondsLeft > 1) {
                     secondsLeft--;
                 } else {
-                    console.log('Time is up, submitting quiz...');
                     $wire.submit();
                 }
             } else {
                 if (secondsLeft > 1) {
                     secondsLeft--;
                 } else {
-                    console.log('Time up for this question...');
                     if ($wire.currentQuestionIndex < $wire.questionsCount - 1) {
                         secondsLeft = {{ $quiz->duration_per_question ?? 60 }};
                         $wire.changeQuestion();
                     } else {
-                        console.log('No more questions, submitting quiz...');
                         $wire.submit();
                     }
                 }
             }
-        }, 1000);">
+        }, 1000)"
+        class="space-y-6"
+    >
+        {{-- Header with Timer --}}
+        <div class="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ $quiz->title }}</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    Question {{ $currentQuestionIndex + 1 }} of {{ $this->questionsCount }}
+                </p>
+            </div>
 
-        <!-- Timer Display -->
-        <div class="mb-4">
+            {{-- Timer Badge --}}
             <div class="flex items-center gap-2">
-                <span class="text-lg font-semibold">Time left:</span>
-                <span x-text="secondsLeft" class="text-2xl font-bold" :class="secondsLeft <= 10 ? 'text-red-600' : 'text-emerald-600'"></span>
-                <span class="text-lg">seconds</span>
-            </div>
-            <div x-show="secondsLeft <= 5" class="mt-1 text-red-500 font-bold animate-pulse">
-                ⚠️ Hurry up! Time is running out.
-            </div>
-        </div>
-
-        <!-- Quiz Question Section -->
-        <x-filament::section class="mt-6">
-            <x-slot name="heading">
-                <span class="font-bold text-gray-700">Question {{ $currentQuestionIndex + 1 }} of {{ $this->questionsCount }}</span>
-            </x-slot>
-
-            <h2 class="mb-4 text-xl font-semibold text-gray-900">{{ $currentQuestion->question_text }}</h2>
-
-            <!-- Show code snippet if present -->
-            @if ($currentQuestion->code_snippet)
-                <pre class="mb-4 border-2 border-gray-200 bg-gray-100 dark:bg-gray-800 dark:border-gray-700 p-3 rounded-lg text-sm font-mono overflow-x-auto">{{ $currentQuestion->code_snippet }}</pre>
-            @endif
-
-            <!-- Single Answer: text input -->
-            @if ($currentQuestion->type === 'single_answer')
-                <div class="mt-4">
-                    <x-filament::input.wrapper>
-                        <x-filament::input
-                            type="text"
-                            wire:model="questionsAnswers.{{ $currentQuestionIndex }}"
-                            placeholder="Type your answer here"
-                        />
-                    </x-filament::input.wrapper>
+                <div
+                    class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                    :class="secondsLeft <= 60 ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'"
+                >
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span x-text="formatTime(secondsLeft)" class="font-bold text-lg"></span>
                 </div>
-
-            <!-- Checkbox: allow multiple selections -->
-            @elseif ($currentQuestion->type === 'checkbox')
-                <div class="space-y-2 mt-4">
-                    @foreach($currentQuestion->questionOptions as $option)
-                        <div wire:key="option.{{ $currentQuestionIndex }}.{{ $option->id }}" class="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                            <label for="checkbox-option-{{ $option->id }}" class="cursor-pointer flex items-center gap-3">
-                                <x-filament::input.checkbox
-                                    id="checkbox-option-{{ $option->id }}"
-                                    value="{{ $option->id }}"
-                                    wire:model="questionsAnswers.{{ $currentQuestionIndex }}"
-                                />
-                                <span class="text-base">{{ $option->option }}</span>
-                            </label>
-                        </div>
-                    @endforeach
-                </div>
-
-            <!-- Multiple Choice: radio buttons (default) -->
-            @else
-                <div class="space-y-2 mt-4">
-                    @foreach($currentQuestion->questionOptions as $option)
-                        <div wire:key="option.{{ $currentQuestionIndex }}.{{ $option->id }}" class="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                            <label for="radio-option-{{ $option->id }}" class="cursor-pointer flex items-center gap-3">
-                                <x-filament::input.radio
-                                    id="radio-option-{{ $option->id }}"
-                                    value="{{ $option->id }}"
-                                    name="questionsAnswers.{{ $currentQuestionIndex }}"
-                                    wire:model="questionsAnswers.{{ $currentQuestionIndex }}"
-                                />
-                                <span class="text-base">{{ $option->option }}</span>
-                            </label>
-                        </div>
-                    @endforeach
-                </div>
-            @endif
-        </x-filament::section>
-
-        <!-- Navigation Buttons -->
-        <div class="mt-6 flex justify-between items-center">
-            <div>
-                @if ($currentQuestionIndex > 0)
-                    <x-filament::button type="button" color="gray" wire:click="previousQuestion">
-                        ← Previous
-                    </x-filament::button>
-                @endif
-            </div>
-
-            <div>
-                @if ($currentQuestionIndex < $this->questionsCount - 1)
-                    <x-filament::button type="button" x-on:click="secondsLeft = {{ $quiz->duration_per_question ?? 60 }}; $wire.changeQuestion();">
-                        Next Question →
-                    </x-filament::button>
-                @else
-                    <x-filament::button type="submit" wire:click="submit" color="success">
-                        ✓ Submit Quiz
-                    </x-filament::button>
-                @endif
             </div>
         </div>
 
-        <!-- Progress indicator -->
-        <div class="mt-6">
-            <div class="flex items-center gap-2 text-sm text-gray-500">
-                <span>Progress:</span>
-                <div class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                    <div class="bg-emerald-500 h-2 rounded-full transition-all duration-300" style="width: {{ (($currentQuestionIndex + 1) / $this->questionsCount) * 100 }}%"></div>
+        {{-- Progress Bar --}}
+        @if ($quiz->show_progress_bar)
+            <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                <div class="mb-2 flex items-center justify-between">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Progress</span>
+                    <span class="text-sm text-gray-600 dark:text-gray-400">
+                        {{ $this->answeredCount }} / {{ $this->questionsCount }} answered
+                    </span>
                 </div>
-                <span>{{ $currentQuestionIndex + 1 }}/{{ $this->questionsCount }}</span>
+                <div class="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                    <div
+                        class="h-full bg-primary-600 transition-all duration-300 dark:bg-primary-500"
+                        style="width: {{ $this->progressPercentage }}%"
+                    ></div>
+                </div>
+            </div>
+        @endif
+
+        {{-- Main Content Area - Layout based on navigator position --}}
+        @php
+            $navigatorPosition = $navigatorPosition ?? 'bottom';
+            $showNavigator = $quiz->show_one_question_at_a_time && $quiz->allow_question_navigation && $navigatorPosition !== 'hidden';
+        @endphp
+
+        <div class="@if($showNavigator && in_array($navigatorPosition, ['left', 'right'])) flex gap-6 @endif">
+
+            {{-- Left Navigator --}}
+            @if ($showNavigator && $navigatorPosition === 'left')
+                @include('filament.student.pages.partials.question-navigator', ['position' => 'sidebar'])
+            @endif
+
+            {{-- Question Content --}}
+            <div class="@if($showNavigator && in_array($navigatorPosition, ['left', 'right'])) flex-1 @else w-full @endif">
+
+                {{-- Top Navigator --}}
+                @if ($showNavigator && $navigatorPosition === 'top')
+                    @include('filament.student.pages.partials.question-navigator', ['position' => 'horizontal'])
+                @endif
+
+                {{-- Question Display --}}
+                <div class="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+                    <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
+                        {{ $currentQuestion->question_text }}
+                    </h3>
+
+                    {{-- Code Snippet --}}
+                    @if ($currentQuestion->code_snippet)
+                        <pre class="mb-6 rounded-lg border-2 border-gray-200 bg-gray-100 p-4 text-sm font-mono overflow-x-auto dark:border-gray-700 dark:bg-gray-800">{{ $currentQuestion->code_snippet }}</pre>
+                    @endif
+
+                    {{-- Answer Options --}}
+                    <div class="space-y-3">
+                        @if ($currentQuestion->type === 'single_answer')
+                            <div class="mt-4">
+                                <x-filament::input.wrapper>
+                                    <x-filament::input
+                                        type="text"
+                                        wire:model.live.debounce.500ms="questionsAnswers.{{ $currentQuestionIndex }}"
+                                        placeholder="Type your answer here"
+                                        class="w-full"
+                                    />
+                                </x-filament::input.wrapper>
+                            </div>
+
+                        @elseif ($currentQuestion->type === 'checkbox')
+                            @foreach ($currentQuestion->questionOptions as $option)
+                                <label
+                                    wire:key="option-{{ $currentQuestionIndex }}-{{ $option->id }}"
+                                    class="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-4 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800
+                                    {{ in_array($option->id, $questionsAnswers[$currentQuestionIndex] ?? []) ? 'bg-primary-50 border-primary-500 dark:bg-primary-950 dark:border-primary-500' : '' }}"
+                                >
+                                    <x-filament::input.checkbox
+                                        id="checkbox-{{ $option->id }}"
+                                        value="{{ $option->id }}"
+                                        wire:model.live="questionsAnswers.{{ $currentQuestionIndex }}"
+                                    />
+                                    <span class="flex-1 text-sm text-gray-700 dark:text-gray-300">{{ $option->option }}</span>
+                                </label>
+                            @endforeach
+
+                        @else
+                            {{-- Multiple Choice (Radio) --}}
+                            @foreach ($currentQuestion->questionOptions as $option)
+                                <label
+                                    wire:key="option-{{ $currentQuestionIndex }}-{{ $option->id }}"
+                                    class="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-4 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800
+                                    {{ isset($questionsAnswers[$currentQuestionIndex]) && $questionsAnswers[$currentQuestionIndex] == $option->id ? 'bg-primary-50 border-primary-500 dark:bg-primary-950 dark:border-primary-500' : '' }}"
+                                >
+                                    <x-filament::input.radio
+                                        id="radio-{{ $option->id }}"
+                                        value="{{ $option->id }}"
+                                        name="questionsAnswers.{{ $currentQuestionIndex }}"
+                                        wire:model.live="questionsAnswers.{{ $currentQuestionIndex }}"
+                                    />
+                                    <span class="flex-1 text-sm text-gray-700 dark:text-gray-300">{{ $option->option }}</span>
+                                </label>
+                            @endforeach
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Bottom Navigator --}}
+                @if ($showNavigator && $navigatorPosition === 'bottom')
+                    @include('filament.student.pages.partials.question-navigator', ['position' => 'horizontal'])
+                @endif
+
+                {{-- Navigation Buttons --}}
+                <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex gap-2">
+                        @if ($quiz->allow_question_navigation && $currentQuestionIndex > 0)
+                            <x-filament::button
+                                type="button"
+                                color="gray"
+                                wire:click="previousQuestion"
+                            >
+                                <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                </svg>
+                                Previous
+                            </x-filament::button>
+                        @endif
+
+                        @if ($currentQuestionIndex < $this->questionsCount - 1)
+                            <x-filament::button
+                                type="button"
+                                color="gray"
+                                x-on:click="secondsLeft = {{ $quiz->duration_per_question ?? 60 }}; $wire.changeQuestion();"
+                            >
+                                Next
+                                <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </x-filament::button>
+                        @endif
+                    </div>
+
+                    <x-filament::button
+                        type="button"
+                        color="success"
+                        wire:click="submit"
+                        wire:confirm="Are you sure you want to submit this quiz? You cannot change your answers after submission."
+                    >
+                        <span wire:loading.remove wire:target="submit">Submit Quiz</span>
+                        <span wire:loading wire:target="submit">Submitting...</span>
+                    </x-filament::button>
+                </div>
+            </div>
+
+            {{-- Right Navigator --}}
+            @if ($showNavigator && $navigatorPosition === 'right')
+                @include('filament.student.pages.partials.question-navigator', ['position' => 'sidebar'])
+            @endif
+        </div>
+
+        {{-- Warning when time is low --}}
+        <div
+            x-show="secondsLeft <= 30"
+            x-transition
+            class="fixed bottom-4 right-4 rounded-lg bg-red-600 px-4 py-3 text-white shadow-lg"
+        >
+            <div class="flex items-center gap-2">
+                <svg class="h-5 w-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span class="font-medium">Time is running out!</span>
             </div>
         </div>
     </div>
